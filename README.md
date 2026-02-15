@@ -6,7 +6,7 @@
 
 ![System Status](https://img.shields.io/badge/Status-Operational-success?style=flat-square) ![Version](https://img.shields.io/badge/Version-v2.1.0-blue?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-gray?style=flat-square)
 
-## 🚀 Key Features
+## Key Features
 
 ### Core Infrastructure
 *   **Microservices Architecture**: Decoupled components via Apache Kafka.
@@ -22,7 +22,7 @@
     *   **System Configuration**: Pause/Resume data feeds and toggle notifications.
     *   **Documentation Hub**: Integrated modal with API specs and architectural diagrams.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 *   **Frontend**: React 18, Vite, TailwindCSS, Recharts, Lucide Icons.
 *   **Backend**: Go (Gin), Python (Kafka-Python), Node.js (Express).
@@ -30,7 +30,7 @@
 *   **Database**: MongoDB (v7.0).
 *   **Containerization**: Docker & Docker Compose.
 
-## 🏁 Quick Start
+## Quick Start
 
 ### Prerequisites
 *   Docker & Docker Compose installed on your machine.
@@ -54,7 +54,7 @@
     > *   **Username**: `admin`
     > *   **Password**: `password` (or any non-empty string)
 
-## 🕹 Usage Guide
+## Usage Guide
 
 ### 1. Generating Traffic
 You can simulate incoming events using the included Python script or via cURL.
@@ -77,7 +77,7 @@ curl -X POST http://localhost:8090/ingest \
 *   **Settings**: Navigate to **Profile -> Settings** to pause the live feed or toggle notifications.
 *   **Documentation**: Click the "Documentation" link in the top utility bar for API details.
 
-## 📡 API Reference
+## API Reference
 
 ### Ingest Event
 **POST** `/ingest`
@@ -96,7 +96,7 @@ curl -X POST http://localhost:8090/ingest \
 **GET** `/api/events/stream`
 *Server-Sent Events (SSE) endpoint for real-time dashboard updates.*
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 *   **Services not starting?** Check logs: `docker-compose logs -f`
 *   **No data in dashboard?** Ensure the "Feed Paused" setting is **OFF** in your profile settings.
