@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-page: #F5F5F7;
+  --text-main: #333333;
+}
+
+body {
+  @apply bg-bg-page text-text-main font-sans antialiased overflow-hidden;
+  background-image: none;
+}
+
+/* Scrollbar Polish */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400 transition-colors;
+}
+
+/* Dashboard Container */
+.dashboard-container {
+  @apply h-screen w-screen flex flex-col overflow-hidden relative text-text-main;
+}
+
+/* Header Styles */
+.top-bar {
+  @apply bg-brand-secondary text-white text-[10px] uppercase font-bold tracking-widest py-1 px-6 flex justify-between items-center;
+}
+
+.main-header {
+  @apply bg-bg-header border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm z-20;
+}
+
+/* Card Styles */
+.content-card {
+  @apply bg-white border border-gray-200 rounded shadow-card transition-all duration-300;
+}
+
+.content-card:hover {
+  @apply shadow-card-hover border-gray-300;
+}
+
+/* Stats Cards */
+.stats-card {
+  @apply content-card p-6 flex flex-col justify-between h-32 hover:-translate-y-1 cursor-default;
+}
+
+.stats-icon-wrapper {
+  @apply p-2 rounded bg-gray-50 text-brand-secondary transition-colors;
+}
+
+.stats-card:hover .stats-icon-wrapper {
+  @apply bg-brand-primary/10 text-brand-primary;
+}
+
+/* Typography */
+.header-title {
+  @apply text-xl font-bold tracking-tight text-brand-secondary font-sans uppercase;
+}
+
+.section-title {
+  @apply text-xs font-bold uppercase tracking-[0.1em] text-brand-secondary mb-4 flex items-center gap-2 border-b-2 border-brand-primary/20 pb-2 w-full;
+}
+
+/* Feed Items */
+.feed-item {
+  @apply relative pl-4 border-l-2 border-gray-200 py-2 mb-4 transition-all duration-300 ease-out;
+}
+
+.feed-item::before {
+  content: "";
+  @apply absolute -left-[5px] top-3 w-2 h-2 rounded-full bg-white border-2 border-gray-300 transition-colors;
+}
+
+.feed-item:hover::before {
+  @apply border-brand-primary bg-brand-primary;
+}
+
+.feed-item:hover {
+  @apply border-brand-primary/30 pl-5 bg-gray-50;
+}
+
+.feed-content {
+  @apply text-sm text-gray-700 leading-relaxed font-normal;
+}
+
+.feed-meta {
+  @apply flex items-center gap-3 text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1;
+}
+
+.json-preview {
+  @apply mt-2 font-mono text-[10px] text-gray-600 bg-gray-100 p-2 rounded border border-gray-200 overflow-x-auto;
+}
+
+/* Status Dot */
+.status-dot {
+  @apply w-2 h-2 rounded-full mx-2 animate-pulse;
+  box-shadow: 0 0 5px currentColor;
+}
+
+/* Recharts Tooltip Override */
+.recharts-tooltip-cursor {
+  stroke: #A12027 !important;
+  stroke-dasharray: 4 4;
+}
+
+.recharts-default-tooltip {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 4px !important;
+}
+
+.recharts-tooltip-item {
+  color: #333 !important;
+  font-family: 'JetBrains Mono' !important;
+  font-size: 11px !important;
+}
