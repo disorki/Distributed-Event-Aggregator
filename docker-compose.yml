@@ -66,6 +66,11 @@ services:
       mongodb:
         condition: service_healthy
     restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
 
   consumer:
     build: ./consumer
@@ -79,6 +84,11 @@ services:
       mongodb:
         condition: service_healthy
     restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
   dashboard:
     build: ./dashboard
@@ -87,6 +97,16 @@ services:
     depends_on:
       - producer
     restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
 volumes:
   mongo_data:

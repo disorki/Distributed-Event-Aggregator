@@ -105,7 +105,12 @@ def analyse_sentiment(text: str) -> dict:
     """Run TextBlob sentiment analysis and return label + score."""
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity  # –1.0 … +1.0
-    label = "Positive" if polarity >= 0 else "Negative"
+    if polarity >= 0.1:
+        label = "Positive"
+    elif polarity <= -0.1:
+        label = "Negative"
+    else:
+        label = "Neutral"
     return {
         "sentiment": label,
         "score": round(polarity, 4),
@@ -118,6 +123,7 @@ def process_message(
     producer: KafkaProducer,
 ) -> None:
     """Parse, analyse, store, and forward a single message."""
+    _start = time.monotonic()
 
     # 1. Parse JSON ──────────────────────────────────────────
     try:
@@ -158,6 +164,8 @@ def process_message(
         return
 
     # 4. Build MongoDB document ──────────────────────────────
+    processing_time_ms = round((time.monotonic() - _start) * 1000, 2)
+    analysis["processing_time_ms"] = processing_time_ms
     doc = {
         "_id": event.get("id", str(uuid.uuid4())),
         "source": event.get("source", "unknown"),

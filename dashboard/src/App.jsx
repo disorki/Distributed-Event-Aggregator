@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Zap, TrendingUp, AlertTriangle, CheckCircle2, Terminal, Info, Clock, Menu, Search, Bell, User, X, FileText, Server, Shield, LogOut, Settings, CreditCard, HelpCircle, ChevronRight, Mail, Lock, Eye, EyeOff, RefreshCw, PauseCircle, PlayCircle, Moon, Sun } from 'lucide-react';
 
@@ -424,6 +424,22 @@ const Card = ({ title, value, icon: Icon, trend }) => (
     </div>
 );
 
+/* Custom Chart Tooltip */
+const CustomChartTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    const score = payload[0].value;
+    const color = score >= 0.1 ? '#10b981' : score <= -0.1 ? '#ef4444' : '#f59e0b';
+    const sentiment = score >= 0.1 ? 'Positive' : score <= -0.1 ? 'Negative' : 'Neutral';
+    return (
+        <div className="custom-tooltip">
+            <div className="tooltip-label">{label}</div>
+            <div className="tooltip-score" style={{ color }}>{score.toFixed(4)}</div>
+            <div className="text-[10px] font-medium" style={{ color }}>{sentiment}</div>
+            <div className="tooltip-bar" style={{ backgroundColor: color }} />
+        </div>
+    );
+};
+
 function App() {
     /* App State */
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -448,30 +464,84 @@ function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
 
     const eventsEndRef = useRef(null);
+    const [uptime, setUptime] = useState(0);
+    const [reconnectCount, setReconnectCount] = useState(0);
 
-    /* Event Source Logic */
+    /* Uptime counter */
     useEffect(() => {
-        if (!isLoggedIn) return; // Don't connect if not logged in
+        if (!isLoggedIn) return;
+        const interval = setInterval(() => setUptime(u => u + 1), 1000);
+        return () => clearInterval(interval);
+    }, [isLoggedIn]);
 
-        const eventSource = new EventSource('/api/events/stream');
-        eventSource.onopen = () => setConnected(true);
-        eventSource.onmessage = (event) => {
-            // Check if feed is paused by settings
-            if (settings.feedPaused) return;
+    const formatUptime = useCallback((s) => {
+        const h = Math.floor(s / 3600).toString().padStart(2, '0');
+        const m = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+        const sec = (s % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${sec}`;
+    }, []);
 
-            try {
-                const newEvent = JSON.parse(event.data);
-                setEvents(prev => [...prev, newEvent].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).slice(-100)); // Increased buffer for search
-            } catch (e) {
-                console.error('Parse error', e);
+    /* Event Source Logic with Auto-Reconnect */
+    useEffect(() => {
+        if (!isLoggedIn) return;
+
+        let retries = 0;
+        const MAX_RETRIES = 10;
+        let es = null;
+        let reconnectTimer = null;
+
+        const connect = () => {
+            es = new EventSource('/api/events/stream');
+            es.onopen = () => {
+                setConnected(true);
+                retries = 0;
+            };
+            es.onmessage = (event) => {
+                if (settings.feedPaused) return;
+                try {
+                    const newEvent = JSON.parse(event.data);
+                    setEvents(prev => [...prev, newEvent].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).slice(-100));
+                } catch (e) {
+                    console.error('Parse error', e);
+                }
+            };
+            es.onerror = () => {
+                setConnected(false);
+                es.close();
+                if (retries < MAX_RETRIES) {
+                    retries++;
+                    setReconnectCount(retries);
+                    reconnectTimer = setTimeout(connect, 3000);
+                }
+            };
+        };
+
+        connect();
+
+        return () => {
+            if (es) es.close();
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+        };
+    }, [isLoggedIn, settings.feedPaused]);
+
+    /* Keyboard Shortcuts */
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === '/' && !showSearch && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                setShowSearch(true);
+            }
+            if (e.key === 'Escape') {
+                setShowSearch(false);
+                setShowDocs(false);
+                setShowSettings(false);
+                setShowProfile(false);
+                setShowNotifications(false);
             }
         };
-        eventSource.onerror = () => {
-            if (eventSource.readyState === 2) setConnected(false);
-            eventSource.close();
-        };
-        return () => eventSource.close();
-    }, [isLoggedIn, settings.feedPaused]);
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [showSearch]);
 
     useEffect(() => {
         if (events.length === 0) return;
@@ -529,7 +599,7 @@ function App() {
                 <div className="flex gap-4">
                     <span>Infrastructural Monitoring System</span>
                     <span className="opacity-50">|</span>
-                    <span>v2.0.4-stable</span>
+                    <span>v2.2.0-stable</span>
                 </div>
                 <div className="flex gap-4">
                     <a href="https://lolz.live/members/10214819/" target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:text-gray-200 transition-colors">Support</a>
@@ -634,14 +704,15 @@ function App() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                                             <XAxis dataKey="time" stroke="#9ca3af" tick={{ fill: '#6b7280', fontSize: 10, fontFamily: 'Inter' }} axisLine={false} tickLine={false} dy={10} />
                                             <YAxis domain={[-1, 1]} stroke="#9ca3af" tick={{ fill: '#6b7280', fontSize: 10, fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
-                                            <Tooltip />
+                                            <Tooltip content={<CustomChartTooltip />} />
                                             <Area type="monotone" dataKey="score" stroke="#A12027" strokeWidth={2} fillOpacity={1} fill="url(#colorScore)" isAnimationActive={false} />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 border-2 border-dashed border-gray-100 rounded-lg">
-                                        <Activity className="w-8 h-8 opacity-20" />
-                                        <span className="text-xs font-medium uppercase tracking-widest">Waiting for data stream...</span>
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 border-2 border-dashed border-gray-100 rounded-lg">
+                                        <Activity className="w-10 h-10 opacity-20 animate-pulse-slow" />
+                                        <span className="text-xs font-medium uppercase tracking-widest animate-pulse-slow">Awaiting data stream...</span>
+                                        <span className="text-[10px] text-gray-300">Events will appear here once the pipeline is active</span>
                                     </div>
                                 )}
                             </div>
@@ -658,7 +729,7 @@ function App() {
                                 {events.slice().reverse().map((event, idx) => (
                                     <div key={idx} className="feed-item group">
                                         <div className="feed-meta">
-                                            <span className={`font-bold ${event.analysis?.sentiment === 'Positive' ? 'text-green-600' : event.analysis?.sentiment === 'Negative' ? 'text-red-600' : 'text-gray-500'}`}>
+                                            <span className={`font-bold ${event.analysis?.sentiment === 'Positive' ? 'text-green-600' : event.analysis?.sentiment === 'Negative' ? 'text-red-600' : event.analysis?.sentiment === 'Neutral' ? 'text-amber-500' : 'text-gray-500'}`}>
                                                 {event.source}
                                             </span>
                                             <span className="text-gray-300">|</span>
@@ -683,6 +754,23 @@ function App() {
                     </div>
                 </div>
             </main>
+
+            {/* System Footer */}
+            <footer className="system-footer">
+                <div className="flex items-center gap-4">
+                    <span>Session Uptime: <strong>{formatUptime(uptime)}</strong></span>
+                    <span className="opacity-30">|</span>
+                    <span>Buffered Events: <strong>{events.length}</strong></span>
+                    {reconnectCount > 0 && <>
+                        <span className="opacity-30">|</span>
+                        <span className="text-amber-500">Reconnects: {reconnectCount}</span>
+                    </>}
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className="opacity-50">Press <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9px]">/</kbd> to search</span>
+                    <span>DEA v2.2.0</span>
+                </div>
+            </footer>
         </div>
     );
 }

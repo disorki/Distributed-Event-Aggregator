@@ -295,6 +295,99 @@ func handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// GET /api/stats — aggregated dashboard statistics from MongoDB.
+func handleStats(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// --- Totals & sentiment breakdown ---
+	pipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "total", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "avg_score", Value: bson.D{{Key: "$avg", Value: "$analysis.score"}}},
+			{Key: "positive", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$analysis.sentiment", "Positive"}}}, 1, 0}}}}}},
+			{Key: "neutral", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$analysis.sentiment", "Neutral"}}}, 1, 0}}}}}},
+			{Key: "negative", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$analysis.sentiment", "Negative"}}}, 1, 0}}}}}},
+			{Key: "last_event_at", Value: bson.D{{Key: "$max", Value: "$timestamp"}}},
+		}}},
+	}
+
+	cursor, err := eventsCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	type aggResult struct {
+		Total       int     `bson:"total"        json:"total_events"`
+		AvgScore    float64 `bson:"avg_score"    json:"avg_score"`
+		Positive    int     `bson:"positive"     json:"-"`
+		Neutral     int     `bson:"neutral"      json:"-"`
+		Negative    int     `bson:"negative"     json:"-"`
+		LastEventAt string  `bson:"last_event_at" json:"last_event_at"`
+	}
+
+	var results []aggResult
+	if err := cursor.All(ctx, &results); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(results) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"total_events":       0,
+			"avg_score":          0,
+			"sentiment_breakdown": gin.H{"positive": 0, "neutral": 0, "negative": 0},
+			"top_sources":        []string{},
+			"last_event_at":      "",
+		})
+		return
+	}
+
+	r := results[0]
+
+	// --- Top 5 sources ---
+	srcPipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$source"},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
+		{{Key: "$limit", Value: 5}},
+	}
+
+	srcCursor, err := eventsCol.Aggregate(ctx, srcPipeline)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer srcCursor.Close(ctx)
+
+	type srcEntry struct {
+		Source string `bson:"_id"   json:"source"`
+		Count  int    `bson:"count" json:"count"`
+	}
+	var topSources []srcEntry
+	if err := srcCursor.All(ctx, &topSources); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_events": r.Total,
+		"avg_score":    fmt.Sprintf("%.4f", r.AvgScore),
+		"sentiment_breakdown": gin.H{
+			"positive": r.Positive,
+			"neutral":  r.Neutral,
+			"negative": r.Negative,
+		},
+		"top_sources":   topSources,
+		"last_event_at": r.LastEventAt,
+	})
+}
+
 // ────────────────────────────────────────────────────────────
 // Main
 // ────────────────────────────────────────────────────────────
@@ -321,6 +414,7 @@ func main() {
 	r.POST("/ingest", handleIngest)
 	r.GET("/api/events", handleGetEvents)
 	r.GET("/api/events/stream", handleSSE)
+	r.GET("/api/stats", handleStats)
 	r.GET("/health", handleHealth)
 
 	port := env("PORT", "8090")
